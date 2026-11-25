@@ -1,5 +1,9 @@
 {
+  "title": "SafeBand",
   "description": "A personal safety app for users and trusted contacts to manage check-ins, configure emergency alerts, and track simulated smartwatch SOS delivery and history.",
+  "icons": {
+    "icon": "/favicon.svg"
+  },
   "robots": {
     "index": false
   },
