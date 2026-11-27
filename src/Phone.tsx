@@ -8,7 +8,7 @@ export type Ctx = {
   alerts: Alert[]; s: Settings; setS: (f: (s: Settings) => Settings) => void
   battery: number; coords: { lat: number; lng: number }
   detailId: string | null; setDetailId: (id: string | null) => void
-  unread: number; toast: { kind: Kind; text: string } | null
+  unread: number; notify: (text: string) => void; toast: { kind: Kind; text: string } | null
   searching: boolean; pair: () => void; unpair: () => void
   clearHistory: () => void
 }
@@ -60,16 +60,17 @@ function MapPin({ lat, lng, shared = true }: { lat: number; lng: number; shared?
         <div className="absolute -translate-x-1/2 -translate-y-full" style={{ left: `${x}%`, top: `${y}%`, color: '#B91C1C' }}><Ico n="pin" size={28} /></div>
         <div className="absolute w-3 h-3 rounded-full border border-slate/50 -translate-x-1/2 -translate-y-1/2 bg-slate/30" style={{ left: `${x}%`, top: `${y}%` }} />
       </> : <div className="absolute inset-0 grid place-items-center bg-stone/80 text-[12px] text-ink-soft">Ubicación no compartida en este nivel</div>}
-      <div className="absolute left-2 bottom-1.5 mono text-[9px] text-ink-soft">SIMULADO · 1:2 500</div>
     </div>
   )
 }
 
 /* ---------- Inicio ---------- */
 function Inicio({ c }: { c: Ctx }) {
+  const [info, setInfo] = useState(false)
   const last = c.alerts[0]
-  const status = !c.s.paired ? 'No vinculado' : c.s.connected ? 'Emparejado' : 'Sin enlace'
+  const status = !c.s.paired ? 'No vinculado' : c.s.connected ? 'Enlazado' : 'Sin enlace'
   const col = !c.s.paired || !c.s.connected ? '#C85A32' : '#2E6F5E'
+  if (info) return <NivelesInfo c={c} onBack={() => setInfo(false)} />
   return (
     <div className="px-5 pb-6">
       <div className="pt-3"><Label>{new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}</Label>
@@ -80,14 +81,11 @@ function Inicio({ c }: { c: Ctx }) {
           <div><Label>Reloj vinculado</Label><div className="font-semibold mt-0.5">SafeBand S1 · Muñeca izq.</div></div>
           <div className="flex items-center gap-2 text-[12px] font-semibold" style={{ color: col }}><i className={`w-2 h-2 rounded-full ${c.s.connected ? '' : 'blink'}`} style={{ background: col }} />{status}</div>
         </div>
-        <div className="grid grid-cols-3 divide-x divide-line">
-          {[['Batería', `${c.battery}%`], ['Señal BLE', c.s.connected ? '−54 dBm' : '—'], ['GPS', c.s.connected ? '±4 m' : '—']].map(([k, v]) => (
-            <div key={k} className="px-4 py-3"><Label>{k}</Label><div className="mono text-lg font-medium mt-0.5">{v}</div></div>))}
-        </div>
+        <div className="pl-4 pr-0 py-3"><Label>Batería</Label><div className="mono text-lg font-medium mt-0.5">{c.battery}%</div></div>
         <div className="h-1.5 bg-line"><div className="h-full bg-sage" style={{ width: `${c.battery}%` }} /></div>
       </div>
 
-      <Section title="Niveles de escalada">
+      <Section title="Niveles de Alerta" right={<button onClick={() => setInfo(true)} className="text-[12px] underline">Ver más</button>}>
         <div className="border border-line divide-y divide-line bg-paper">
           {[{ k: 'checkin', n: 1, g: '1 pulsación corta', t: 'Check-in silencioso' }, { k: 'preventiva', n: 2, g: '2 pulsaciones rápidas', t: `Preventiva · ${c.s.countdown} s cancelable` }, { k: 'sos', n: 3, g: 'Mantener 3 s', t: 'SOS inmediato' }].map((r) => {
             const num = c.contacts.filter((x) => x[r.k as 'sos']).length
@@ -125,8 +123,42 @@ function Inicio({ c }: { c: Ctx }) {
   )
 }
 
+/* ---------- Información de niveles ---------- */
+const LEVELS: { k: 'checkin' | 'preventiva' | 'sos'; n: number; g: string; t: string; d: string; items: string[] }[] = [
+  { k: 'checkin', n: 1, g: '1 pulsación corta', t: 'Check-in silencioso', d: 'Avisa a tus contactos de que vas de camino y que estás bien. No suena ni vibra en sus teléfonos como una emergencia.', items: ['Envía el mensaje «En camino · Sin novedad».', 'No comparte ubicación, salvo que lo actives en Configuración.', 'Solo llega a los contactos marcados con Check-in.'] },
+  { k: 'preventiva', n: 2, g: '2 pulsaciones rápidas', t: 'Alerta preventiva', d: 'Para cuando te sientes en riesgo pero aún no necesitas ayuda inmediata. Inicia una cuenta atrás que puedes cancelar.', items: ['Cuenta atrás cancelable en el reloj antes de notificar.', 'Si no cancelas, avisa a los contactos con Preventiva.', 'Incluye hora, batería y tu ubicación en ese instante.'] },
+  { k: 'sos', n: 3, g: 'Mantener 3 s', t: 'SOS inmediato', d: 'Escalada máxima, sin cuenta atrás. Se envía en cuanto se completa la pulsación mantenida.', items: ['Notifica al instante a los contactos con SOS.', 'Envía ubicación, hora, batería y nivel 3.', 'Puedes marcarla como falsa alarma con «Estoy a salvo» desde el reloj.'] },
+]
+function NivelesInfo({ c, onBack }: { c: Ctx; onBack: () => void }) {
+  return (
+    <div className="px-5 pb-6">
+      <button onClick={onBack} className="flex items-center gap-1 text-[13px] font-semibold pt-3"><Ico n="back" size={16} />Inicio</button>
+      <h1 className="text-[24px] font-bold mt-3 leading-tight">Niveles de alerta</h1>
+      <p className="text-[13px] text-ink-soft mt-1">Qué hace cada pulsación del botón lateral del reloj y a quién avisa.</p>
+      <div className="mt-4 space-y-3">
+        {LEVELS.map((l) => {
+          const num = c.contacts.filter((x) => x[l.k]).length
+          return (
+            <div key={l.k} className="border border-line bg-paper">
+              <div className="flex items-center gap-3 p-3 text-white" style={{ background: KIND_COLOR[l.k] }}>
+                <div className="mono w-7 h-7 grid place-items-center text-[12px] font-bold border border-white/70">{l.n}</div>
+                <div className="flex-1"><div className="text-[15px] font-bold leading-tight">{l.t}</div><div className="mono text-[11px] opacity-90">{l.g}</div></div>
+              </div>
+              <div className="p-3">
+                <p className="text-[13px] leading-snug">{l.d}</p>
+                <ul className="mt-2 space-y-1.5">{l.items.map((i) => <li key={i} className="flex gap-2 text-[12px] text-ink-soft leading-snug"><span className="shrink-0 mt-0.5" style={{ color: KIND_COLOR[l.k] }}><Ico n="check" size={13} /></span>{i}</li>)}</ul>
+                <div className="mono text-[11px] mt-3 pt-2 border-t border-line text-ink-soft">{num} {num === 1 ? 'contacto lo recibe' : 'contactos lo reciben'}</div>
+              </div>
+            </div>)
+        })}
+      </div>
+      <button onClick={() => c.setTab('contactos')} className="w-full mt-4 bg-pine text-stone text-[14px] font-semibold py-3 min-h-[44px]">Gestionar contactos</button>
+    </div>
+  )
+}
+
 /* ---------- Contactos ---------- */
-const blank = { name: '', rel: 'Familia', phone: '', checkin: true, preventiva: true, sos: true }
+const blank = { name: '', rel: 'Familia', phone: '', checkin: false, preventiva: false, sos: false }
 function Contactos({ c }: { c: Ctx }) {
   const [edit, setEdit] = useState<Contact | null>(null)
   const [isNew, setIsNew] = useState(false)
@@ -137,9 +169,10 @@ function Contactos({ c }: { c: Ctx }) {
   const save = () => {
     if (!edit) return
     if (edit.name.trim().length < 2) return setErr('Escribe el nombre del contacto.')
-    if (edit.phone.replace(/\D/g, '').length < 9) return setErr('El teléfono debe tener al menos 9 dígitos.')
+    if (edit.phone.replace(/\D/g, '').length < 8) return setErr('Ingresa un teléfono válido')
     c.setContacts((l) => (isNew ? [...l, edit] : l.map((x) => (x.id === edit.id ? edit : x))))
     setEdit(null)
+    c.notify(isNew ? 'Contacto guardado con éxito' : 'Contacto editado con éxito')
   }
   return (
     <div className="px-5 pb-6">
@@ -166,17 +199,17 @@ function Contactos({ c }: { c: Ctx }) {
           <div className="slidein w-full bg-stone border-t border-pine p-5 max-h-full overflow-y-auto">
             <div className="flex justify-between items-center"><h2 className="text-lg font-bold">{isNew ? 'Nuevo contacto' : 'Editar contacto'}</h2><button onClick={() => setEdit(null)} aria-label="Cerrar"><Ico n="close" /></button></div>
             <label className="block mt-3"><Label>Nombre</Label><input value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} placeholder="Nombre y apellido" className="w-full mt-1 border border-line bg-paper px-3 py-2.5 text-[15px]" /></label>
-            <label className="block mt-3"><Label>Teléfono</Label><input value={edit.phone} inputMode="tel" onChange={(e) => setEdit({ ...edit, phone: e.target.value })} placeholder="+34 600 000 000" className="mono w-full mt-1 border border-line bg-paper px-3 py-2.5 text-[15px]" /></label>
+            <label className="block mt-3"><Label>Teléfono</Label><input value={edit.phone} inputMode="tel" onChange={(e) => setEdit({ ...edit, phone: e.target.value })} placeholder="+506 8888 8888" className="mono w-full mt-1 border border-line bg-paper px-3 py-2.5 text-[15px]" /></label>
             <label className="block mt-3"><Label>Relación</Label>
-              <select value={edit.rel} onChange={(e) => setEdit({ ...edit, rel: e.target.value })} className="w-full mt-1 border border-line bg-paper px-3 py-2.5 text-[15px]">{['Pareja', 'Familia', 'Amistad', 'Trabajo'].map((o) => <option key={o}>{o}</option>)}</select></label>
+              <select value={edit.rel} onChange={(e) => setEdit({ ...edit, rel: e.target.value })} className="w-full mt-1 border border-line bg-paper px-3 py-2.5 text-[15px]">{['Pareja', 'Familia', 'Amistad', 'Roommate', 'Trabajo'].map((o) => <option key={o}>{o}</option>)}</select></label>
             <div className="mt-3"><Label>Recibe</Label>
               <div className="grid grid-cols-3 mt-1 border border-line">{TIERS.map((t) => (
-                <button key={t.k} aria-pressed={edit[t.k]} onClick={() => setEdit({ ...edit, [t.k]: !edit[t.k] })} className="py-2.5 text-[12px] font-semibold border-r border-line last:border-r-0" style={edit[t.k] ? { background: t.color, color: '#fff' } : { background: '#fbfaf7' }}>{t.short}</button>))}</div></div>
+                <button key={t.k} aria-pressed={edit[t.k]} onClick={() => setEdit({ ...edit, [t.k]: !edit[t.k] })} className="py-2.5 text-[12px] font-semibold border-r border-line last:border-r-0 flex items-center justify-center gap-1" style={edit[t.k] ? { background: t.color, color: '#fff' } : { background: '#fbfaf7' }}>{edit[t.k] && <Ico n="check" size={13} />}{t.short}</button>))}</div></div>
             {err && <p role="alert" className="text-crimson text-[13px] font-semibold mt-3">{err}</p>}
             <div className="flex gap-2 mt-4">
               <button onClick={save} className="flex-1 bg-pine text-stone font-semibold py-3">Guardar</button>
               {!isNew && (confirmDel
-                ? <button onClick={() => { c.setContacts((l) => l.filter((x) => x.id !== edit.id)); setEdit(null) }} className="bg-crimson text-white font-semibold px-4">Confirmar</button>
+                ? <button onClick={() => { c.setContacts((l) => l.filter((x) => x.id !== edit.id)); setEdit(null); c.notify('Contacto eliminado con éxito') }} className="bg-crimson text-white font-semibold px-4">Confirmar</button>
                 : <button onClick={() => setConfirmDel(true)} className="border border-crimson text-crimson font-semibold px-4">Eliminar</button>)}
             </div>
           </div>
@@ -190,6 +223,7 @@ const FILTERS: { k: Kind | 'todos'; l: string }[] = [{ k: 'todos', l: 'Todos' },
 const STATUS_COL = { enviando: '#C85A32', entregado: '#2E6F5E', 'leído': '#1E3A2F' }
 function Alertas({ c }: { c: Ctx }) {
   const [f, setF] = useState<Kind | 'todos'>('todos')
+  const [confirmClear, setConfirmClear] = useState(false)
   const detail = c.alerts.find((a) => a.id === c.detailId)
   if (detail) {
     const shared = !Number.isNaN(detail.lat)
@@ -201,6 +235,7 @@ function Alertas({ c }: { c: Ctx }) {
           <div className="text-[22px] font-bold leading-tight mt-1">{KIND_LABEL[detail.kind]}</div>
           <div className="mono text-[13px] mt-1">{fmtDate(detail.ts)} · {fmtTime(detail.ts)}</div>
         </div>
+        {detail.safe && <div role="status" className="mt-2 p-3 border border-sage bg-paper flex items-center gap-2 text-[13px] font-semibold" style={{ color: '#2E6F5E', borderColor: '#2E6F5E' }}><Ico n="check" size={16} />Marcada como a salvo · falsa alarma a las {fmtTime(detail.safe)}</div>}
         <p className="text-[14px] mt-3">{detail.note}</p>
         <Section title="Ubicación"><MapPin lat={detail.lat} lng={detail.lng} shared={shared} />
           {shared && <div className="mono text-[12px] mt-2 grid grid-cols-2 gap-1"><span>{fmtCoord(detail.lat, 'N', 'S')}</span><span>{fmtCoord(detail.lng, 'E', 'O')}</span></div>}</Section>
@@ -228,14 +263,23 @@ function Alertas({ c }: { c: Ctx }) {
             <button key={a.id} onClick={() => c.setDetailId(a.id)} className="w-full text-left flex items-stretch gap-3 py-3 border-b border-line">
               <div className="w-1 shrink-0" style={{ background: KIND_COLOR[a.kind] }} />
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2"><span className="font-semibold text-[14px]">{KIND_LABEL[a.kind]}</span><Tag kind={a.kind} /></div>
+                <div className="flex items-center gap-2"><span className="font-semibold text-[14px]">{KIND_LABEL[a.kind]}</span><Tag kind={a.kind} />{a.safe && <span className="mono text-[10px] uppercase font-bold tracking-wider" style={{ color: '#2E6F5E' }}>✓ A salvo</span>}</div>
                 <div className="mono text-[11px] text-ink-soft mt-0.5">{fmtDate(a.ts)} · {fmtTime(a.ts)}</div>
                 <div className="text-[12px] mt-1 truncate">{a.receipts.length ? `${done}/${a.receipts.length} entregados` : a.kind === 'cancelada' ? 'Nadie notificado' : 'Sin destinatarios'}</div>
               </div><Ico n="chev" size={16} />
             </button>)
         })}
       </div>
-      <button onClick={c.clearHistory} className="text-[12px] underline text-ink-soft mt-4">Borrar historial de la simulación</button>
+      {confirmClear
+        ? <div role="alertdialog" aria-label="Confirmar borrado" className="mt-4 border border-crimson bg-paper p-3">
+            <p className="text-[13px] font-semibold">¿Borrar todo el historial de alertas?</p>
+            <p className="text-[12px] text-ink-soft mt-0.5">Esta acción no se puede deshacer.</p>
+            <div className="flex gap-2 mt-3">
+              <button onClick={() => { c.clearHistory(); setConfirmClear(false); c.notify('Historial eliminado con éxito') }} className="flex-1 bg-crimson text-white font-semibold py-2.5 text-[13px]">Eliminar</button>
+              <button onClick={() => setConfirmClear(false)} className="flex-1 border border-line font-semibold py-2.5 text-[13px]">Cancelar</button>
+            </div>
+          </div>
+        : <button onClick={() => setConfirmClear(true)} disabled={c.alerts.length === 0} className="w-full mt-4 flex items-center justify-center gap-2 border border-crimson text-crimson text-[14px] font-semibold py-3 min-h-[44px] disabled:border-line disabled:text-ink-soft disabled:opacity-50 disabled:cursor-not-allowed"><Ico n="close" size={16} />Borrar historial de la simulación</button>}
     </div>
   )
 }
@@ -275,7 +319,7 @@ function Config({ c }: { c: Ctx }) {
       </Section>
       <Section title="Privacidad">
         <div className="text-[13px] leading-relaxed space-y-2 border-l-2 border-pine pl-3">
-          <p><b>Qué se envía.</b> Hora, nivel, batería del celular y, si la regla lo permite, tu posición en ese instante.</p>
+          <p><b>Qué se envía.</b> Hora, nivel, batería del reloj y, si la regla lo permite, tu posición en ese instante.</p>
           <p><b>A quién.</b> Solo a los contactos que marcaste para ese nivel. Nunca a terceros ni a servicios externos.</p>
           <p><b>Qué no se hace.</b> No hay seguimiento continuo en segundo plano. El historial vive en este dispositivo y puedes borrarlo.</p>
         </div>
@@ -297,7 +341,7 @@ export default function Phone({ c }: { c: Ctx }) {
         </div>
         {c.toast && (
           <div key={c.toast.text} role="status" className="slidein absolute top-11 inset-x-3 z-30 text-white px-3 py-2.5 flex items-center gap-2.5 border border-black/20" style={{ background: c.toast.kind === 'sos' ? '#B91C1C' : c.toast.kind === 'cancelada' ? '#14171A' : KIND_COLOR[c.toast.kind] }}>
-            <Ico n="alertas" size={18} /><div className="text-[12px] leading-tight"><b>{c.toast.text}</b></div></div>)}
+            <Ico n={/eliminado|guardado|editado/.test(c.toast.text) ? 'check' : 'alertas'} size={18} /><div className="text-[12px] leading-tight"><b>{c.toast.text}</b></div></div>)}
         <div className="flex-1 overflow-y-auto" key={c.tab}>
           {c.tab === 'inicio' && <Inicio c={c} />}{c.tab === 'contactos' && <Contactos c={c} />}{c.tab === 'alertas' && <Alertas c={c} />}{c.tab === 'config' && <Config c={c} />}
         </div>

@@ -1,0 +1,10 @@
+{
+  "description": "A personal safety app for users and trusted contacts to manage check-ins, configure emergency alerts, and track simulated smartwatch SOS delivery and history.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}

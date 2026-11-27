@@ -1,7 +1,7 @@
 export type Kind = 'checkin' | 'preventiva' | 'cancelada' | 'sos'
 export type Contact = { id: string; name: string; rel: string; phone: string; checkin: boolean; preventiva: boolean; sos: boolean }
 export type Receipt = { contactId: string; name: string; status: 'enviando' | 'entregado' | 'leído'; at?: number }
-export type Alert = { id: string; kind: Kind; ts: number; lat: number; lng: number; battery: number; tier: number; receipts: Receipt[]; note: string; source: 'Reloj' | 'App' }
+export type Alert = { id: string; kind: Kind; ts: number; lat: number; lng: number; battery: number; tier: number; receipts: Receipt[]; note: string; source: 'Reloj' | 'App'; safe?: number }
 export type Settings = {
   location: 'alert' | 'checkin'; haptic: boolean; hold: boolean; pocket: boolean; window: number; countdown: number; connected: boolean; paired: boolean
 }
@@ -25,9 +25,9 @@ export const SEED_CONTACTS: Contact[] = [
 ]
 
 export const SEED_ALERTS: Alert[] = [
-  { id: 'a1', kind: 'checkin', ts: h(3, 12), lat: 40.41831, lng: -3.70275, battery: 83, tier: 1, source: 'Reloj', note: 'En camino · Sin ubicación', receipts: rc([['c1', 'Marta Ibáñez'], ['c2', 'Lucía Ibáñez']]) },
+  { id: 'a1', kind: 'checkin', ts: h(3, 12), lat: 40.41831, lng: -3.70275, battery: 83, tier: 1, source: 'Reloj', note: 'En camino · Sin novedad', receipts: rc([['c1', 'Marta Ibáñez'], ['c2', 'Lucía Ibáñez']]) },
   { id: 'a2', kind: 'cancelada', ts: h(26), lat: 40.42377, lng: -3.69141, battery: 74, tier: 2, source: 'Reloj', note: 'Cancelada a los 3 s · pulsación accidental en el bolso', receipts: [] },
   { id: 'a3', kind: 'preventiva', ts: h(52, 20), lat: 40.40992, lng: -3.69886, battery: 61, tier: 2, source: 'Reloj', note: 'Cuenta atrás completada · camino poco iluminado', receipts: rc([['c1', 'Marta Ibáñez'], ['c2', 'Lucía Ibáñez'], ['c3', 'Andrés Roldán']]) },
-  { id: 'a4', kind: 'checkin', ts: h(74), lat: 40.43012, lng: -3.70411, battery: 90, tier: 1, source: 'Reloj', note: 'En camino · Sin ubicación', receipts: rc([['c1', 'Marta Ibáñez'], ['c2', 'Lucía Ibáñez']]) },
+  { id: 'a4', kind: 'checkin', ts: h(74), lat: 40.43012, lng: -3.70411, battery: 90, tier: 1, source: 'Reloj', note: 'En camino · Sin novedad', receipts: rc([['c1', 'Marta Ibáñez'], ['c2', 'Lucía Ibáñez']]) },
   { id: 'a5', kind: 'sos', ts: h(120), lat: 40.41544, lng: -3.70742, battery: 48, tier: 3, source: 'Reloj', note: 'Simulacro de prueba con contactos', receipts: rc([['c1', 'Marta Ibáñez'], ['c2', 'Lucía Ibáñez'], ['c3', 'Andrés Roldán'], ['c4', 'Carmen Soler']]) },
 ]
